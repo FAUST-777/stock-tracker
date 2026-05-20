@@ -174,16 +174,15 @@ app.post('/api/alerts', (req, res) => {
 
 app.get('/api/chart/:symbol/:period', async (req, res) => {
   const { symbol, period } = req.params;
-  const rangeMap    = { '1d':'1d',  '5d':'5d',  '1mo':'3mo', '3mo':'3mo' };
-  const intervalMap = { '1d':'5m',  '5d':'15m', '1mo':'1d',  '3mo':'1d'  };
-  // 3mo 用 Yahoo 的 range=3mo，1mo 也用 3mo range 取近 1 個月的點
+  const rangeMap    = { '1d':'1d', '5d':'5d', '1mo':'3mo', '3mo':'3mo', '6mo':'6mo', '1y':'1y' };
+  const intervalMap = { '1d':'5m', '5d':'15m', '1mo':'1d', '3mo':'1d',  '6mo':'1d',  '1y':'1wk' };
+  const cutoffDays  = { '1mo': 30 };
   const range    = rangeMap[period]    ?? '1d';
   const interval = intervalMap[period] ?? '5m';
   try {
     let data = await fetchChart(symbol, range, interval);
-    // 1mo 只取最近 30 天
-    if (period === '1mo') {
-      const cutoff = Date.now() - 30 * 86400_000;
+    if (cutoffDays[period]) {
+      const cutoff = Date.now() - cutoffDays[period] * 86400_000;
       data = data.filter(d => d.t >= cutoff);
     }
     res.json(data);
