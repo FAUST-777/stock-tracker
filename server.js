@@ -1,10 +1,10 @@
-const express = require('express');
-const http    = require('http');
+const express  = require('express');
+const http     = require('http');
+const https    = require('https');
 const WebSocket = require('ws');
-const yahoo   = require('yahoo-finance2').default;
 const notifier = require('node-notifier');
-const fs      = require('fs');
-const path    = require('path');
+const fs       = require('fs');
+const path     = require('path');
 
 const app    = express();
 const server = http.createServer(app);
@@ -13,10 +13,85 @@ const wss    = new WebSocket.Server({ server });
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-const SYMBOLS    = ['VOO', 'VTI', 'QQQ'];
+const SYMBOLS     = ['VOO', 'VTI', 'QQQ'];
 const ALERTS_FILE = path.join(__dirname, 'alerts.json');
-const PORT       = 3000;
-const INTERVAL_MS = 60_000; // 每 60 秒更新
+const PORT        = 3000;
+const INTERVAL_MS = 60_000;
+
+// ── Direct Yahoo Finance HTTP helper ─────────────────────────────────────────
+const YF_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Accept': 'application/json, text/plain, */*',
+  'Accept-Language': 'en-US,en;q=0.9',
+  'Origin': 'https://finance.yahoo.com',
+  'Referer': 'https://finance.yahoo.com/',
+};
+
+function yfGet(url) {
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, { headers: YF_HEADERS }, (res) => {
+      let raw = '';
+      res.on('data', c => raw += c);
+      res.on('end', () => {
+        try { resolve(JSON.parse(raw)); }
+        catch { reject(new Error(`Non-JSON response (${res.statusCode}): ${raw.slice(0, 120)}`)); }
+      });
+    });
+    req.on('error', reject);
+    req.setTimeout(12000, () => { req.destroy(); reject(new Error('Request timeout')); });
+  });
+}
+
+// ── Fetch quotes (用 /v8/chart meta，不需 auth) ───────────────────────────────
+async function fetchQuotes() {
+  const out = {};
+  for (const sym of SYMBOLS) {
+    try {
+      const url  = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=1d`;
+      const data = await yfGet(url);
+      const m    = data?.chart?.result?.[0]?.meta ?? {};
+      const prev = m.chartPreviousClose ?? m.previousClose ?? 0;
+      const price = m.regularMarketPrice ?? 0;
+      const change = price - prev;
+      const changePct = prev ? (change / prev) * 100 : 0;
+      out[sym] = {
+        symbol:    sym,
+        name:      m.longName || m.shortName || sym,
+        price,
+        change,
+        changePct,
+        open:      m.regularMarketOpen      ?? prev,
+        high:      m.regularMarketDayHigh   ?? price,
+        low:       m.regularMarketDayLow    ?? price,
+        prevClose: prev,
+        volume:    m.regularMarketVolume    ?? 0,
+        marketState: m.marketState          ?? 'CLOSED',
+      };
+    } catch (e) {
+      console.error(`[${sym}] fetch error:`, e.message);
+    }
+  }
+  return out;
+}
+
+// ── Fetch chart data ──────────────────────────────────────────────────────────
+async function fetchChart(symbol, range, interval) {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=${interval}&range=${range}&includePrePost=false`;
+  const data = await yfGet(url);
+  const result = data?.chart?.result?.[0];
+  if (!result) throw new Error('No chart data returned');
+
+  const ts     = result.timestamp ?? [];
+  const q      = result.indicators?.quote?.[0] ?? {};
+  return ts.map((t, i) => ({
+    t: t * 1000,
+    o: q.open?.[i]  ?? null,
+    h: q.high?.[i]  ?? null,
+    l: q.low?.[i]   ?? null,
+    c: q.close?.[i] ?? null,
+    v: q.volume?.[i] ?? null,
+  })).filter(d => d.c !== null);
+}
 
 // ── Alert persistence ─────────────────────────────────────────────────────────
 function loadAlerts() {
@@ -30,34 +105,8 @@ function saveAlerts(data) {
 }
 
 let alerts = loadAlerts();
-const lastAlertFired = {}; // symbol_high / symbol_low → timestamp
-const COOLDOWN = 5 * 60_000; // 同一警報 5 分鐘只響一次
-
-// ── Fetch quotes ──────────────────────────────────────────────────────────────
-async function fetchQuotes() {
-  const out = {};
-  for (const sym of SYMBOLS) {
-    try {
-      const q = await yahoo.quote(sym, {}, { validateResult: false });
-      out[sym] = {
-        symbol:        sym,
-        name:          q.longName || q.shortName || sym,
-        price:         q.regularMarketPrice      ?? 0,
-        change:        q.regularMarketChange     ?? 0,
-        changePct:     q.regularMarketChangePercent ?? 0,
-        open:          q.regularMarketOpen       ?? 0,
-        high:          q.regularMarketDayHigh    ?? 0,
-        low:           q.regularMarketDayLow     ?? 0,
-        prevClose:     q.regularMarketPreviousClose ?? 0,
-        volume:        q.regularMarketVolume     ?? 0,
-        marketState:   q.marketState             ?? 'CLOSED',
-      };
-    } catch (e) {
-      console.error(`[${sym}] fetch error:`, e.message);
-    }
-  }
-  return out;
-}
+const lastAlertFired = {};
+const COOLDOWN = 5 * 60_000;
 
 // ── Check & fire alerts ───────────────────────────────────────────────────────
 function checkAlerts(quotes) {
@@ -79,7 +128,6 @@ function checkAlerts(quotes) {
         message: `${dir}\n現價 $${price.toFixed(2)}  目標 $${target.toFixed(2)}`,
         sound:   true,
         wait:    false,
-        appID:   'Stock Tracker',
       });
       triggered.push({ symbol: sym, type: kind, price, target });
       console.log(`[ALERT] ${sym} ${kind}: ${price} vs ${target}`);
@@ -91,21 +139,21 @@ function checkAlerts(quotes) {
   return triggered;
 }
 
-// ── Broadcast to all WS clients ───────────────────────────────────────────────
+// ── Broadcast ─────────────────────────────────────────────────────────────────
 function broadcast(payload) {
   const msg = JSON.stringify(payload);
   wss.clients.forEach(c => { if (c.readyState === WebSocket.OPEN) c.send(msg); });
 }
 
-// ── Main update loop ──────────────────────────────────────────────────────────
+// ── Tick ──────────────────────────────────────────────────────────────────────
 async function tick() {
   try {
     const quotes    = await fetchQuotes();
     const triggered = checkAlerts(quotes);
     broadcast({ type: 'update', quotes, triggered, alerts, ts: Date.now() });
-    process.stdout.write(`[${new Date().toLocaleTimeString()}] prices updated\n`);
+    process.stdout.write(`[${new Date().toLocaleTimeString()}] updated: ${Object.keys(quotes).map(s => `${s}=$${quotes[s].price}`).join(' ')}\n`);
   } catch (e) {
-    console.error('tick error:', e.message);
+    console.error('[tick]', e.message);
   }
 }
 
@@ -126,21 +174,21 @@ app.post('/api/alerts', (req, res) => {
 
 app.get('/api/chart/:symbol/:period', async (req, res) => {
   const { symbol, period } = req.params;
-  const map = {
-    '1d':  { period1: new Date(Date.now() - 1  * 86400_000), interval: '5m'  },
-    '5d':  { period1: new Date(Date.now() - 5  * 86400_000), interval: '15m' },
-    '1mo': { period1: new Date(Date.now() - 30 * 86400_000), interval: '1d'  },
-    '3mo': { period1: new Date(Date.now() - 90 * 86400_000), interval: '1d'  },
-  };
-  const cfg = map[period] ?? map['1d'];
+  const rangeMap    = { '1d':'1d',  '5d':'5d',  '1mo':'3mo', '3mo':'3mo' };
+  const intervalMap = { '1d':'5m',  '5d':'15m', '1mo':'1d',  '3mo':'1d'  };
+  // 3mo 用 Yahoo 的 range=3mo，1mo 也用 3mo range 取近 1 個月的點
+  const range    = rangeMap[period]    ?? '1d';
+  const interval = intervalMap[period] ?? '5m';
   try {
-    const r = await yahoo.chart(symbol, { period1: cfg.period1, interval: cfg.interval }, { validateResult: false });
-    const data = (r.quotes ?? []).filter(q => q.close != null).map(q => ({
-      t: new Date(q.date).getTime(),
-      o: q.open, h: q.high, l: q.low, c: q.close, v: q.volume,
-    }));
+    let data = await fetchChart(symbol, range, interval);
+    // 1mo 只取最近 30 天
+    if (period === '1mo') {
+      const cutoff = Date.now() - 30 * 86400_000;
+      data = data.filter(d => d.t >= cutoff);
+    }
     res.json(data);
   } catch (e) {
+    console.error(`[chart] ${symbol}/${period}:`, e.message);
     res.status(500).json({ error: e.message });
   }
 });
@@ -148,8 +196,12 @@ app.get('/api/chart/:symbol/:period', async (req, res) => {
 // ── WebSocket ─────────────────────────────────────────────────────────────────
 wss.on('connection', async (ws) => {
   console.log('[WS] client connected');
-  const quotes = await fetchQuotes();
-  ws.send(JSON.stringify({ type: 'update', quotes, triggered: [], alerts, ts: Date.now() }));
+  try {
+    const quotes = await fetchQuotes();
+    ws.send(JSON.stringify({ type: 'update', quotes, triggered: [], alerts, ts: Date.now() }));
+  } catch (e) {
+    console.error('[WS init]', e.message);
+  }
 });
 
 // ── Start ─────────────────────────────────────────────────────────────────────
