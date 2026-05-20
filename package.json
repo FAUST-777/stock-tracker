@@ -1,0 +1,15 @@
+{
+  "name": "stock-tracker",
+  "version": "1.0.0",
+  "description": "VOO / VTI / QQQ 即時追蹤與價格警報",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "node-notifier": "^10.0.1",
+    "ws": "^8.16.0",
+    "yahoo-finance2": "^2.11.3"
+  }
+}
