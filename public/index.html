@@ -6,283 +6,187 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <style>
 :root {
-  --bg:      #0a0b0f;
-  --panel:   #111318;
-  --card:    #13161e;
-  --border:  #00d4aa;
-  --border2: #1c2230;
-  --text:    #e8eaf0;
-  --muted:   #5a6478;
-  --green:   #00d4aa;
-  --red:     #ff4d6d;
-  --gold:    #f5a623;
-  --blue:    #3b82f6;
+  --bg:     #0a0b0f;
+  --panel:  #111318;
+  --card:   #13161e;
+  --border: #00d4aa;
+  --dim:    #1c2230;
+  --text:   #e8eaf0;
+  --muted:  #5a6478;
+  --green:  #00d4aa;
+  --red:    #ff4d6d;
+  --gold:   #f5a623;
 }
-* { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { height: 100%; }
-body {
-  font-family: 'Segoe UI', system-ui, sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{
+  font-family:'Segoe UI',system-ui,sans-serif;
+  background:var(--bg);color:var(--text);
+  height:100vh;display:flex;flex-direction:column;
 }
 
-/* ── Top bar ── */
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 20px;
-  border-bottom: 1px solid var(--border2);
-  flex-shrink: 0;
+/* topbar */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 18px;border-bottom:1px solid var(--dim);flex-shrink:0;
 }
-.topbar-title { font-size: 1rem; font-weight: 700; color: var(--green); letter-spacing: 1px; }
-.topbar-right { display: flex; align-items: center; gap: 10px; font-size: .75rem; color: var(--muted); }
-.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
-.dot.live { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.topbar-logo{font-size:.9rem;font-weight:800;color:var(--green);letter-spacing:1.5px}
+.topbar-right{display:flex;align-items:center;gap:8px;font-size:.72rem;color:var(--muted)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.dot.live{background:var(--green);box-shadow:0 0 5px var(--green)}
 
-/* ── Main layout ── */
-.layout {
-  flex: 1;
-  display: flex;
-  gap: 0;
-  overflow: hidden;
-  padding: 16px;
-  gap: 16px;
+/* layout */
+.layout{flex:1;display:flex;gap:14px;padding:14px;overflow:hidden;min-height:0}
+
+/* ── LEFT ── */
+.left{
+  width:260px;flex-shrink:0;
+  display:flex;flex-direction:column;gap:8px;
+  overflow-y:auto;
 }
 
-/* ── LEFT PANEL ── */
-.left-panel {
-  width: 340px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  overflow-y: auto;
+/* compact stock row */
+.srow{
+  background:var(--card);
+  border:1px solid var(--dim);
+  border-radius:10px;
+  padding:10px 12px;
+  cursor:pointer;
+  transition:border-color .15s;
+  /* NO canvas, fixed content */
 }
+.srow:hover{border-color:rgba(0,212,170,.4)}
+.srow.active{border-color:var(--border);box-shadow:0 0 0 1px var(--border)}
 
-.stock-card {
-  background: var(--card);
-  border: 1px solid var(--border2);
-  border-radius: 12px;
-  padding: 14px 16px;
-  cursor: pointer;
-  transition: border-color .2s;
-  position: relative;
-}
-.stock-card:hover  { border-color: var(--border); }
-.stock-card.active { border-color: var(--border); box-shadow: 0 0 0 1px var(--border); }
+.srow-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.srow-sym{font-size:1.05rem;font-weight:900;letter-spacing:.5px;width:38px}
+.srow-price{font-size:1rem;font-weight:800;font-variant-numeric:tabular-nums}
+.srow-chg{font-size:.72rem;font-weight:700;text-align:right;flex:1}
+.up{color:var(--green)} .down{color:var(--red)}
 
-.card-row1 {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 4px;
+.mkt-tag{
+  font-size:.55rem;font-weight:700;padding:2px 6px;border-radius:10px;
+  flex-shrink:0;
 }
-.card-sym  { font-size: 1.3rem; font-weight: 900; letter-spacing: 1px; }
-.card-name { font-size: .65rem; color: var(--muted); margin-bottom: 6px; }
-.card-price-row { display: flex; align-items: baseline; gap: 8px; }
-.card-price { font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; }
-.card-change { font-size: .85rem; font-weight: 700; }
-.up   { color: var(--green); }
-.down { color: var(--red); }
-.card-meta {
-  display: flex; gap: 12px;
-  font-size: .65rem; color: var(--muted);
-  margin-top: 5px;
-}
-.card-meta span b { color: #8899aa; font-weight: 600; }
-.card-spark { height: 48px; margin-top: 8px; }
-.market-tag {
-  font-size: .6rem; font-weight: 700;
-  padding: 2px 7px; border-radius: 20px;
-}
-.tag-REGULAR { background:#0a2e1e; color:var(--green); }
-.tag-PRE     { background:#0d1f3c; color:#93c5fd; }
-.tag-POST    { background:#1e0f35; color:#c4b5fd; }
-.tag-CLOSED  { background:#1a1e2a; color:var(--muted); }
+.tag-REGULAR{background:#0a2e1e;color:var(--green)}
+.tag-PRE    {background:#0d1f3c;color:#93c5fd}
+.tag-POST   {background:#1e0f35;color:#c4b5fd}
+.tag-CLOSED {background:#1a1e2a;color:var(--muted)}
 
-/* Alert pill on card */
-.card-alerts {
-  display: flex; gap: 6px;
-  margin-top: 8px;
+/* alert inputs inside card */
+.srow-alerts{
+  display:flex;gap:6px;margin-top:8px;
 }
-.alert-chip {
-  flex: 1; font-size: .62rem; font-weight: 600;
-  padding: 3px 7px; border-radius: 6px;
-  background: #0f1219; border: 1px solid var(--border2);
-  color: var(--muted);
+.ai{display:flex;align-items:center;gap:4px;flex:1}
+.ai label{font-size:.6rem;color:var(--muted);white-space:nowrap}
+.ai input{
+  flex:1;background:#0a0c10;
+  border:1px solid var(--dim);border-radius:5px;
+  color:var(--text);font-size:.72rem;
+  padding:4px 6px;outline:none;width:0;min-width:0;
 }
-.alert-chip.set-h { border-color: #0d3320; color: var(--green); }
-.alert-chip.set-l { border-color: #3a0d1a; color: var(--red); }
+.ai input:focus{border-color:var(--border)}
+.srow-btns{display:flex;gap:5px;margin-top:6px}
+.btn-s{
+  flex:1;border:none;border-radius:6px;
+  font-size:.68rem;font-weight:700;padding:5px;cursor:pointer;
+}
+.btn-save{background:var(--border);color:#000}
+.btn-save:hover{opacity:.85}
+.btn-clr{background:#1a1e2a;color:var(--muted);border:1px solid var(--dim)}
+.btn-clr:hover{color:var(--red);border-color:var(--red)}
 
-/* ── Alert settings (bottom of left panel) ── */
-.alert-panel {
-  background: var(--card);
-  border: 1px solid var(--border2);
-  border-radius: 12px;
-  padding: 14px 16px;
-  margin-top: 4px;
+/* alert chip shown when set */
+.alert-chip-row{display:flex;gap:5px;margin-top:6px}
+.achip{
+  flex:1;font-size:.6rem;padding:2px 6px;border-radius:5px;
+  background:#0a0c10;border:1px solid var(--dim);color:var(--muted);
+  text-align:center;
 }
-.alert-panel h3 {
-  font-size: .82rem; font-weight: 700;
-  color: var(--gold); margin-bottom: 12px;
-}
-.alert-sym-label {
-  font-size: .75rem; font-weight: 700;
-  color: var(--text); margin-bottom: 6px;
-}
-.alert-inputs { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
-.ai-row { display: flex; align-items: center; gap: 6px; }
-.ai-row label { font-size: .65rem; color: var(--muted); width: 52px; }
-.ai-row input {
-  flex: 1; background: #0f1219;
-  border: 1px solid var(--border2);
-  border-radius: 6px; color: var(--text);
-  font-size: .8rem; padding: 5px 8px; outline: none;
-}
-.ai-row input:focus { border-color: var(--border); }
-.alert-sym-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
-.asym-tab {
-  flex: 1; background: #0f1219;
-  border: 1px solid var(--border2);
-  border-radius: 6px; color: var(--muted);
-  font-size: .75rem; font-weight: 700;
-  padding: 5px; cursor: pointer; text-align: center;
-}
-.asym-tab.active { background: #0a2520; border-color: var(--border); color: var(--green); }
-.btn-save-alert {
-  width: 100%; background: var(--border);
-  border: none; border-radius: 7px;
-  color: #000; font-size: .78rem; font-weight: 800;
-  padding: 7px; cursor: pointer; margin-bottom: 5px;
-}
-.btn-save-alert:hover { opacity: .85; }
-.btn-clear-alert {
-  width: 100%; background: transparent;
-  border: 1px solid var(--border2);
-  border-radius: 7px; color: var(--muted);
-  font-size: .72rem; padding: 5px; cursor: pointer;
-}
-.btn-clear-alert:hover { color: var(--red); border-color: var(--red); }
+.achip.h-set{border-color:#0d3320;color:var(--green)}
+.achip.l-set{border-color:#3a0d1a;color:var(--red)}
 
-/* ── RIGHT PANEL ── */
-.right-panel {
-  flex: 1;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  padding: 20px;
+/* ── RIGHT ── */
+.right{
+  flex:1;background:var(--panel);
+  border:1.5px solid var(--border);border-radius:14px;
+  display:flex;flex-direction:column;
+  overflow:hidden;padding:18px 20px;min-width:0;
 }
-.chart-top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 12px;
-  flex-shrink: 0;
+.chart-hdr{
+  display:flex;align-items:flex-start;
+  justify-content:space-between;
+  flex-shrink:0;margin-bottom:10px;
 }
-.chart-sym-big  { font-size: 1.6rem; font-weight: 900; letter-spacing: 1px; }
-.chart-price-big { font-size: 2.2rem; font-weight: 800; margin-top: 2px; }
-.chart-change-big { font-size: 1rem; font-weight: 700; margin-top: 2px; }
-.period-tabs { display: flex; gap: 6px; }
-.ptab {
-  background: transparent; border: 1px solid var(--border2);
-  border-radius: 7px; color: var(--muted);
-  font-size: .75rem; font-weight: 700;
-  padding: 5px 14px; cursor: pointer;
+.ch-left .ch-sym  {font-size:1.4rem;font-weight:900;letter-spacing:1px}
+.ch-left .ch-price{font-size:2rem;font-weight:800;margin-top:2px}
+.ch-left .ch-chg  {font-size:.9rem;font-weight:700;margin-top:2px}
+.period-tabs{display:flex;gap:6px}
+.ptab{
+  background:transparent;border:1px solid var(--dim);
+  border-radius:7px;color:var(--muted);
+  font-size:.72rem;font-weight:700;padding:5px 14px;cursor:pointer;
 }
-.ptab.active, .ptab:hover {
-  background: var(--border); border-color: var(--border); color: #000;
-}
-.chart-wrap { flex: 1; min-height: 0; position: relative; }
-#main-chart { width: 100% !important; height: 100% !important; }
+.ptab.active,.ptab:hover{background:var(--border);border-color:var(--border);color:#000}
+.chart-wrap{flex:1;min-height:0;position:relative}
+#main-chart{width:100%!important;height:100%!important}
 
-/* ── Alert OVERLAY ── */
-#alert-overlay {
-  display: none; position: fixed; inset: 0; z-index: 9999;
-  background: rgba(0,0,0,.88);
-  align-items: center; justify-content: center;
+/* overlay */
+#overlay{
+  display:none;position:fixed;inset:0;z-index:9999;
+  background:rgba(0,0,0,.88);align-items:center;justify-content:center;
 }
-#alert-overlay.show { display: flex; }
-.alert-box {
-  background: #0b0d12;
-  border: 3px solid var(--gold);
-  border-radius: 20px; padding: 36px 52px;
-  text-align: center;
-  animation: pulse-box 1.2s ease-in-out infinite alternate;
+#overlay.show{display:flex}
+.obox{
+  background:#0b0d12;border:3px solid var(--gold);
+  border-radius:20px;padding:36px 52px;text-align:center;
+  animation:pulse 1.2s ease-in-out infinite alternate;
 }
-@keyframes pulse-box {
-  from { box-shadow: 0 0 30px rgba(245,166,35,.3); }
-  to   { box-shadow: 0 0 80px rgba(245,166,35,.8); }
+@keyframes pulse{
+  from{box-shadow:0 0 30px rgba(245,166,35,.3)}
+  to  {box-shadow:0 0 80px rgba(245,166,35,.8)}
 }
-.ao-icon  { font-size: 3rem; }
-.ao-sym   { font-size: 2.5rem; font-weight: 900; color: var(--gold); margin: 6px 0; }
-.ao-dir   { font-size: 1rem; color: var(--muted); }
-.ao-price { font-size: 2.8rem; font-weight: 900; margin: 10px 0 4px 0; }
-.ao-tgt   { font-size: .85rem; color: var(--muted); margin-bottom: 24px; }
-.btn-ok   {
-  background: var(--gold); border: none; border-radius: 10px;
-  color: #000; font-size: .95rem; font-weight: 900;
-  padding: 11px 36px; cursor: pointer;
+.o-icon {font-size:3rem}
+.o-sym  {font-size:2.4rem;font-weight:900;color:var(--gold);margin:6px 0}
+.o-dir  {font-size:1rem;color:var(--muted)}
+.o-price{font-size:2.6rem;font-weight:900;margin:10px 0 4px}
+.o-tgt  {font-size:.85rem;color:var(--muted);margin-bottom:22px}
+.btn-ok {
+  background:var(--gold);border:none;border-radius:10px;
+  color:#000;font-size:.95rem;font-weight:900;
+  padding:10px 36px;cursor:pointer;
 }
 </style>
 </head>
 <body>
 
-<!-- Top bar -->
 <div class="topbar">
-  <div class="topbar-title">📈 STOCK TRACKER</div>
+  <div class="topbar-logo">📈 STOCK TRACKER</div>
   <div class="topbar-right">
     <div class="dot" id="conn-dot"></div>
     <span id="conn-txt">連線中...</span>
-    <span id="last-ts" style="margin-left:8px">--</span>
+    <span id="last-ts" style="margin-left:6px">--</span>
   </div>
 </div>
 
-<!-- Main layout -->
 <div class="layout">
 
-  <!-- LEFT: stock list + alert settings -->
-  <div class="left-panel">
-    <div id="stock-list"></div>
+  <!-- LEFT -->
+  <div class="left" id="left-panel"></div>
 
-    <div class="alert-panel">
-      <h3>🔔 價格警報</h3>
-      <div class="alert-sym-tabs" id="alert-sym-tabs"></div>
-      <div class="alert-inputs">
-        <div class="ai-row">
-          <label>🔺 突破</label>
-          <input type="number" id="inp-high" placeholder="高點價格" step="0.01">
-        </div>
-        <div class="ai-row">
-          <label>🔻 跌破</label>
-          <input type="number" id="inp-low"  placeholder="低點價格" step="0.01">
-        </div>
-      </div>
-      <button class="btn-save-alert"  onclick="saveAlert()">💾 儲存警報</button>
-      <button class="btn-clear-alert" onclick="clearAlert()">✖ 清除警報</button>
-    </div>
-  </div>
-
-  <!-- RIGHT: big chart -->
-  <div class="right-panel">
-    <div class="chart-top">
-      <div>
-        <div class="chart-sym-big"  id="ct-sym">--</div>
-        <div class="chart-price-big" id="ct-price">--</div>
-        <div class="chart-change-big" id="ct-change">--</div>
+  <!-- RIGHT -->
+  <div class="right">
+    <div class="chart-hdr">
+      <div class="ch-left">
+        <div class="ch-sym"   id="ct-sym">--</div>
+        <div class="ch-price" id="ct-price">--</div>
+        <div class="ch-chg"   id="ct-chg">--</div>
       </div>
       <div class="period-tabs">
-        <button class="ptab active" onclick="setPeriod('1d',this)">今日</button>
-        <button class="ptab" onclick="setPeriod('5d',this)">5日</button>
-        <button class="ptab" onclick="setPeriod('1mo',this)">1月</button>
-        <button class="ptab" onclick="setPeriod('3mo',this)">3月</button>
+        <button class="ptab active" data-p="1d"  onclick="setPeriod(this)">今日</button>
+        <button class="ptab"        data-p="5d"  onclick="setPeriod(this)">5日</button>
+        <button class="ptab"        data-p="1mo" onclick="setPeriod(this)">1月</button>
+        <button class="ptab"        data-p="3mo" onclick="setPeriod(this)">3月</button>
       </div>
     </div>
     <div class="chart-wrap">
@@ -292,26 +196,96 @@ body {
 </div>
 
 <!-- Alert overlay -->
-<div id="alert-overlay">
-  <div class="alert-box">
-    <div class="ao-icon" id="ao-icon">🚨</div>
-    <div class="ao-sym"  id="ao-sym">---</div>
-    <div class="ao-dir"  id="ao-dir">---</div>
-    <div class="ao-price up" id="ao-price">$0.00</div>
-    <div class="ao-tgt"  id="ao-tgt">目標 $0.00</div>
-    <button class="btn-ok" onclick="dismissAlert()">✅ 確認</button>
+<div id="overlay">
+  <div class="obox">
+    <div class="o-icon" id="o-icon">🚨</div>
+    <div class="o-sym"  id="o-sym">---</div>
+    <div class="o-dir"  id="o-dir">---</div>
+    <div class="o-price up" id="o-price">$0.00</div>
+    <div class="o-tgt"  id="o-tgt">目標 $0.00</div>
+    <button class="btn-ok" onclick="document.getElementById('overlay').classList.remove('show')">✅ 確認</button>
   </div>
 </div>
 
 <script>
-const SYMBOLS = ['VOO','VTI','QQQ'];
-let quotes  = {};
-let alerts  = {};
-let selSym  = SYMBOLS[0];
-let selPeriod = '1d';
+const SYMS = ['VOO','VTI','QQQ'];
+let quotes = {}, alerts = {}, selSym = SYMS[0], selPeriod = '1d';
 let mainChart = null;
-const sparkData = {}; // symbol → array of close prices for sparkline
-const sparkCharts = {};
+let chartBusy = false; // prevent concurrent chart loads
+let pendingChartLoad = false;
+
+// ── Build left panel (once) ───────────────────────────────────────────────────
+function buildLeft() {
+  const panel = document.getElementById('left-panel');
+  SYMS.forEach(sym => {
+    const div = document.createElement('div');
+    div.id = `srow-${sym}`;
+    div.className = 'srow' + (sym === selSym ? ' active' : '');
+    div.innerHTML = `
+      <div class="srow-top" onclick="selectSym('${sym}')">
+        <span class="srow-sym">${sym}</span>
+        <span class="srow-price" id="price-${sym}">--</span>
+        <span class="srow-chg"   id="chg-${sym}">--</span>
+        <span class="mkt-tag tag-CLOSED" id="mkt-${sym}">--</span>
+      </div>
+      <div class="alert-chip-row">
+        <div class="achip" id="chip-h-${sym}">🔺 未設定</div>
+        <div class="achip" id="chip-l-${sym}">🔻 未設定</div>
+      </div>
+      <div class="srow-alerts">
+        <div class="ai">
+          <label>🔺突破</label>
+          <input type="number" id="inp-h-${sym}" placeholder="高點" step="0.01">
+        </div>
+        <div class="ai">
+          <label>🔻跌破</label>
+          <input type="number" id="inp-l-${sym}" placeholder="低點" step="0.01">
+        </div>
+      </div>
+      <div class="srow-btns">
+        <button class="btn-s btn-save" onclick="saveAlert('${sym}')">💾 儲存</button>
+        <button class="btn-s btn-clr"  onclick="clearAlert('${sym}')">✖ 清除</button>
+      </div>`;
+    panel.appendChild(div);
+  });
+}
+buildLeft();
+
+// ── Update only text nodes (no DOM rebuild) ───────────────────────────────────
+function updatePrices(prevQuotes) {
+  SYMS.forEach(sym => {
+    const q = quotes[sym]; if (!q) return;
+    const up  = q.change >= 0;
+    const cls = up ? 'up' : 'down';
+    const arrow = up ? '▲' : '▼';
+
+    const priceEl = document.getElementById(`price-${sym}`);
+    const chgEl   = document.getElementById(`chg-${sym}`);
+    const mktEl   = document.getElementById(`mkt-${sym}`);
+    if (priceEl) { priceEl.textContent = `$${q.price.toFixed(2)}`; priceEl.className = `srow-price ${cls}`; }
+    if (chgEl)   { chgEl.textContent = `${arrow} ${(up?'+':'')}${q.change.toFixed(2)} (${Math.abs(q.changePct).toFixed(2)}%)`; chgEl.className = `srow-chg ${cls}`; }
+    if (mktEl)   { mktEl.textContent = mktLabel(q.marketState); mktEl.className = `mkt-tag tag-${q.marketState}`; }
+
+    const a = alerts[sym] || {};
+    const chipH = document.getElementById(`chip-h-${sym}`);
+    const chipL = document.getElementById(`chip-l-${sym}`);
+    if (chipH) { chipH.textContent = a.high ? `🔺 $${parseFloat(a.high).toFixed(2)}` : '🔺 未設定'; chipH.className = `achip${a.high?' h-set':''}`; }
+    if (chipL) { chipL.textContent = a.low  ? `🔻 $${parseFloat(a.low).toFixed(2)}`  : '🔻 未設定'; chipL.className = `achip${a.low?' l-set':''}`; }
+  });
+
+  // update right-panel header if selected sym changed
+  const q = quotes[selSym]; if (!q) return;
+  const up = q.change >= 0;
+  document.getElementById('ct-sym').textContent   = selSym;
+  document.getElementById('ct-price').textContent = `$${q.price.toFixed(2)}`;
+  const ctChg = document.getElementById('ct-chg');
+  ctChg.textContent = `${up?'▲':'▼'} ${(up?'+':'')}${q.change.toFixed(2)} (${Math.abs(q.changePct).toFixed(2)}%)`;
+  ctChg.className   = `ch-chg ${up?'up':'down'}`;
+}
+
+function mktLabel(s) {
+  return {REGULAR:'開盤中',PRE:'盤前',POST:'盤後',CLOSED:'已收盤'}[s]??s;
+}
 
 // ── WebSocket ─────────────────────────────────────────────────────────────────
 function connect() {
@@ -321,273 +295,173 @@ function connect() {
     document.getElementById('conn-txt').textContent = '已連線';
   };
   ws.onmessage = ({ data }) => {
-    const msg = JSON.parse(data);
-    if (msg.type === 'update') {
-      const prev = { ...quotes };
-      quotes = msg.quotes;
-      alerts = msg.alerts || {};
-      renderStockList(prev);
-      updateChartHeader();
-      updateAlertPanel();
-      document.getElementById('last-ts').textContent =
-        new Date(msg.ts).toLocaleTimeString('zh-TW');
-      if (msg.triggered?.length) showOverlay(msg.triggered[0]);
-    }
-    if (msg.type === 'alerts') { alerts = msg.alerts || {}; renderStockList(); updateAlertPanel(); }
+    try {
+      const msg = JSON.parse(data);
+      if (msg.type === 'update') {
+        quotes = msg.quotes;
+        alerts = msg.alerts || {};
+        updatePrices({});
+        restoreAlertInputs();
+        document.getElementById('last-ts').textContent = new Date(msg.ts).toLocaleTimeString('zh-TW');
+        if (msg.triggered?.length) showOverlay(msg.triggered[0]);
+      }
+      if (msg.type === 'alerts') { alerts = msg.alerts || {}; updatePrices({}); restoreAlertInputs(); }
+    } catch {}
   };
   ws.onclose = () => {
     document.getElementById('conn-dot').classList.remove('live');
     document.getElementById('conn-txt').textContent = '重連中...';
-    setTimeout(connect, 3000);
+    setTimeout(connect, 4000);
   };
+  ws.onerror = () => ws.close();
 }
 connect();
 
-// ── Stock list ────────────────────────────────────────────────────────────────
-function renderStockList(prev = {}) {
-  const container = document.getElementById('stock-list');
-  SYMBOLS.forEach(sym => {
-    const q = quotes[sym]; if (!q) return;
-    const up   = q.change >= 0;
-    const cls  = up ? 'up' : 'down';
-    const arrow = up ? '▲' : '▼';
-    const pct  = Math.abs(q.changePct).toFixed(2);
-    const chg  = (up?'+':'') + q.change.toFixed(2);
-    const a    = alerts[sym] || {};
-
-    let el = document.getElementById(`sc-${sym}`);
-    if (!el) {
-      el = document.createElement('div');
-      el.id = `sc-${sym}`;
-      el.className = 'stock-card' + (sym === selSym ? ' active' : '');
-      el.onclick = () => selectSym(sym);
-      container.appendChild(el);
-    }
-
-    el.className = 'stock-card' + (sym === selSym ? ' active' : '');
-    el.innerHTML = `
-      <div class="card-row1">
-        <span class="card-sym">${sym}</span>
-        <span class="market-tag tag-${q.marketState}">${mktLabel(q.marketState)}</span>
-      </div>
-      <div class="card-name">${q.name}</div>
-      <div class="card-price-row">
-        <span class="card-price ${cls}">$${q.price.toFixed(2)}</span>
-        <span class="card-change ${cls}">${arrow} ${chg} (${pct}%)</span>
-      </div>
-      <div class="card-meta">
-        <span>開 <b>$${q.open.toFixed(2)}</b></span>
-        <span>高 <b>$${q.high.toFixed(2)}</b></span>
-        <span>低 <b>$${q.low.toFixed(2)}</b></span>
-      </div>
-      <canvas class="card-spark" id="spark-${sym}"></canvas>
-      <div class="card-alerts">
-        <div class="alert-chip ${a.high?'set-h':''}">🔺 ${a.high ? '$'+parseFloat(a.high).toFixed(2) : '未設定'}</div>
-        <div class="alert-chip ${a.low?'set-l':''}">🔻 ${a.low  ? '$'+parseFloat(a.low).toFixed(2)  : '未設定'}</div>
-      </div>`;
-
-    // re-draw sparkline (canvas recreated)
-    drawSpark(sym, up);
+// ── Restore alert input values (don't overwrite if user typing) ───────────────
+function restoreAlertInputs() {
+  SYMS.forEach(sym => {
+    const a  = alerts[sym] || {};
+    const h  = document.getElementById(`inp-h-${sym}`);
+    const l  = document.getElementById(`inp-l-${sym}`);
+    // only restore if field is not focused
+    if (h && document.activeElement !== h) h.value = a.high ?? '';
+    if (l && document.activeElement !== l) l.value = a.low  ?? '';
   });
 }
 
-function mktLabel(s) {
-  return {REGULAR:'開盤中', PRE:'盤前', POST:'盤後', CLOSED:'已收盤'}[s] ?? s;
-}
-
-// ── Sparklines ────────────────────────────────────────────────────────────────
-async function loadSparks() {
-  for (const sym of SYMBOLS) {
-    try {
-      const res  = await fetch(`/api/chart/${sym}/1d`);
-      const data = await res.json();
-      sparkData[sym] = data.map(d => d.c).filter(Boolean);
-    } catch {}
-  }
-  renderStockList({});
-}
-
-function drawSpark(sym, up) {
-  const canvas = document.getElementById(`spark-${sym}`);
-  if (!canvas) return;
-  const pts = sparkData[sym];
-  if (!pts || pts.length < 2) return;
-
-  if (sparkCharts[sym]) { sparkCharts[sym].destroy(); }
-  const color = up ? '#00d4aa' : '#ff4d6d';
-  sparkCharts[sym] = new Chart(canvas, {
-    type: 'line',
-    data: {
-      labels: pts.map((_,i) => i),
-      datasets: [{ data: pts, borderColor: color, borderWidth: 1.5,
-        fill: true,
-        backgroundColor: up ? 'rgba(0,212,170,.08)' : 'rgba(255,77,109,.08)',
-        pointRadius: 0, tension: 0.3 }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false, animation: false,
-      plugins: { legend:{display:false}, tooltip:{enabled:false} },
-      scales: { x:{display:false}, y:{display:false} },
-    }
-  });
-}
-
-// ── Symbol select ─────────────────────────────────────────────────────────────
+// ── Sym select ────────────────────────────────────────────────────────────────
 function selectSym(sym) {
   selSym = sym;
-  renderStockList({});
-  updateChartHeader();
+  SYMS.forEach(s => {
+    const el = document.getElementById(`srow-${s}`);
+    if (el) el.classList.toggle('active', s === sym);
+  });
+  updatePrices({});
   loadMainChart();
-  updateAlertPanel();
 }
 
-// ── Big chart ─────────────────────────────────────────────────────────────────
-function updateChartHeader() {
-  const q = quotes[selSym]; if (!q) return;
-  const up = q.change >= 0;
-  document.getElementById('ct-sym').textContent   = selSym;
-  document.getElementById('ct-price').textContent = `$${q.price.toFixed(2)}`;
-  const ct = document.getElementById('ct-change');
-  ct.textContent = `${up?'▲':'▼'} ${(up?'+':'')}${q.change.toFixed(2)} (${Math.abs(q.changePct).toFixed(2)}%)`;
-  ct.className   = `chart-change-big ${up?'up':'down'}`;
+// ── Alert API ─────────────────────────────────────────────────────────────────
+function saveAlert(sym) {
+  const h = document.getElementById(`inp-h-${sym}`)?.value.trim();
+  const l = document.getElementById(`inp-l-${sym}`)?.value.trim();
+  fetch('/api/alerts', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ symbol: sym, high: h||null, low: l||null }),
+  });
+}
+function clearAlert(sym) {
+  const h = document.getElementById(`inp-h-${sym}`);
+  const l = document.getElementById(`inp-l-${sym}`);
+  if (h) h.value = ''; if (l) l.value = '';
+  fetch('/api/alerts', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ symbol: sym, high: null, low: null }),
+  });
 }
 
+// ── Main chart (with concurrency guard) ───────────────────────────────────────
 async function loadMainChart() {
+  if (chartBusy) { pendingChartLoad = true; return; }
+  chartBusy = true;
+  pendingChartLoad = false;
   try {
     const res  = await fetch(`/api/chart/${selSym}/${selPeriod}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    if (!data.length) return;
+    if (!Array.isArray(data) || !data.length) return;
 
+    const isIntraday = selPeriod === '1d' || selPeriod === '5d';
     const labels = data.map(d => {
       const dt = new Date(d.t);
-      return (selPeriod === '1d' || selPeriod === '5d')
+      return isIntraday
         ? dt.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})
         : dt.toLocaleDateString('zh-TW',{month:'short',day:'numeric'});
     });
     const prices = data.map(d => d.c);
     const q   = quotes[selSym];
-    const up  = q ? q.change >= 0 : prices[prices.length-1] >= prices[0];
+    const up  = q ? q.change >= 0 : (prices[prices.length-1] >= prices[0]);
     const col = up ? '#00d4aa' : '#ff4d6d';
 
-    if (mainChart) mainChart.destroy();
-    const ctx = document.getElementById('main-chart').getContext('2d');
-    const grad = ctx.createLinearGradient(0, 0, 0, ctx.canvas.offsetHeight);
-    grad.addColorStop(0, up ? 'rgba(0,212,170,.18)' : 'rgba(255,77,109,.18)');
+    // destroy old chart safely
+    if (mainChart) { mainChart.destroy(); mainChart = null; }
+
+    const canvas = document.getElementById('main-chart');
+    const ctx = canvas.getContext('2d');
+    const grad = ctx.createLinearGradient(0, 0, 0, canvas.offsetHeight || 400);
+    grad.addColorStop(0, up ? 'rgba(0,212,170,.15)' : 'rgba(255,77,109,.15)');
     grad.addColorStop(1, 'rgba(0,0,0,0)');
 
-    mainChart = new Chart(ctx, {
+    mainChart = new Chart(canvas, {
       type: 'line',
       data: {
         labels,
-        datasets: [{ label: selSym, data: prices,
+        datasets: [{
+          label: selSym, data: prices,
           borderColor: col, borderWidth: 2,
           backgroundColor: grad, fill: true,
-          pointRadius: 0, tension: 0.3 }]
+          pointRadius: 0, tension: 0.3,
+        }]
       },
       options: {
-        responsive: true, maintainAspectRatio: false, animation: false,
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,          // ← 關閉 animation，避免卡頓
+        resizeDelay: 100,
         interaction: { intersect: false, mode: 'index' },
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: '#1a1e2a',
-            borderColor: '#2a3040', borderWidth: 1,
+            backgroundColor: '#1a1e2a', borderColor: '#2a3040', borderWidth: 1,
             callbacks: { label: c => ` $${c.parsed.y.toFixed(2)}` }
           },
         },
         scales: {
-          x: { grid:{color:'#1a1e2a'}, ticks:{color:'#5a6478', maxTicksLimit:8, font:{size:11}} },
-          y: { grid:{color:'#1a1e2a'}, ticks:{color:'#5a6478', callback: v=>'$'+v.toFixed(0), font:{size:11}},
-               position:'right' },
+          x: { grid:{color:'#1a1e2a'}, ticks:{color:'#5a6478',maxTicksLimit:8,font:{size:11}} },
+          y: { grid:{color:'#1a1e2a'}, ticks:{color:'#5a6478',callback:v=>'$'+v.toFixed(0),font:{size:11}}, position:'right' },
         },
       }
     });
-  } catch (e) { console.error('chart load error', e); }
+  } catch (e) {
+    console.error('[chart]', e.message);
+  } finally {
+    chartBusy = false;
+    if (pendingChartLoad) loadMainChart(); // run the queued load
+  }
 }
 
-function setPeriod(p, btn) {
-  selPeriod = p;
+function setPeriod(btn) {
+  selPeriod = btn.dataset.p;
   document.querySelectorAll('.ptab').forEach(t => t.classList.remove('active'));
   btn.classList.add('active');
   loadMainChart();
 }
 
-// ── Alert panel ───────────────────────────────────────────────────────────────
-let alertSym = SYMBOLS[0];
-
-function buildAlertSymTabs() {
-  const div = document.getElementById('alert-sym-tabs');
-  div.innerHTML = SYMBOLS.map(s =>
-    `<div class="asym-tab ${s===alertSym?'active':''}" onclick="switchAlertSym('${s}')">${s}</div>`
-  ).join('');
-}
-
-function switchAlertSym(sym) {
-  alertSym = sym;
-  buildAlertSymTabs();
-  updateAlertPanel();
-}
-
-function updateAlertPanel() {
-  buildAlertSymTabs();
-  const a = alerts[alertSym] || {};
-  document.getElementById('inp-high').value = a.high ?? '';
-  document.getElementById('inp-low').value  = a.low  ?? '';
-}
-
-function saveAlert() {
-  const high = document.getElementById('inp-high').value.trim();
-  const low  = document.getElementById('inp-low').value.trim();
-  fetch('/api/alerts', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ symbol: alertSym, high: high||null, low: low||null }),
-  });
-}
-
-function clearAlert() {
-  document.getElementById('inp-high').value = '';
-  document.getElementById('inp-low').value  = '';
-  fetch('/api/alerts', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ symbol: alertSym, high: null, low: null }),
-  });
-}
-
-// ── Overlay ───────────────────────────────────────────────────────────────────
+// ── Alert overlay ─────────────────────────────────────────────────────────────
 function showOverlay(alert) {
   const up = alert.type === 'high';
-  document.getElementById('ao-icon').textContent  = up ? '📈' : '📉';
-  document.getElementById('ao-sym').textContent   = alert.symbol;
-  document.getElementById('ao-dir').textContent   = up ? '已突破高點警報' : '已跌破低點警報';
-  document.getElementById('ao-price').textContent = `$${parseFloat(alert.price).toFixed(2)}`;
-  document.getElementById('ao-price').className   = `ao-price ${up?'up':'down'}`;
-  document.getElementById('ao-tgt').textContent   = `目標價 $${parseFloat(alert.target).toFixed(2)}`;
-  document.getElementById('alert-overlay').classList.add('show');
-  playBeep(up);
-}
-function dismissAlert() {
-  document.getElementById('alert-overlay').classList.remove('show');
-}
-function playBeep(up) {
+  document.getElementById('o-icon').textContent  = up ? '📈' : '📉';
+  document.getElementById('o-sym').textContent   = alert.symbol;
+  document.getElementById('o-dir').textContent   = up ? '已突破高點警報' : '已跌破低點警報';
+  document.getElementById('o-price').textContent = `$${parseFloat(alert.price).toFixed(2)}`;
+  document.getElementById('o-price').className   = `o-price ${up?'up':'down'}`;
+  document.getElementById('o-tgt').textContent   = `目標價 $${parseFloat(alert.target).toFixed(2)}`;
+  document.getElementById('overlay').classList.add('show');
   try {
     const ac = new AudioContext();
     [up?880:440, up?1100:330].forEach((f,i) => {
-      const o=ac.createOscillator(), g=ac.createGain();
-      o.connect(g); g.connect(ac.destination);
-      o.frequency.value=f; o.type='square';
-      g.gain.setValueAtTime(.2, ac.currentTime+i*.2);
-      g.gain.exponentialRampToValueAtTime(.001, ac.currentTime+i*.2+.18);
-      o.start(ac.currentTime+i*.2); o.stop(ac.currentTime+i*.2+.2);
+      const o=ac.createOscillator(),g=ac.createGain();
+      o.connect(g);g.connect(ac.destination);
+      o.frequency.value=f;o.type='square';
+      g.gain.setValueAtTime(.2,ac.currentTime+i*.2);
+      g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+i*.2+.18);
+      o.start(ac.currentTime+i*.2);o.stop(ac.currentTime+i*.2+.2);
     });
   } catch {}
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
-buildAlertSymTabs();
-loadSparks().then(() => {
-  updateChartHeader();
-  loadMainChart();
-});
+// Delay initial chart load to let WebSocket data arrive first
+setTimeout(loadMainChart, 1500);
 </script>
 </body>
 </html>
