@@ -3,6 +3,7 @@ const http     = require('http');
 const https    = require('https');
 const WebSocket = require('ws');
 const notifier = require('node-notifier');
+const cron     = require('node-cron');
 const fs       = require('fs');
 const path     = require('path');
 
@@ -245,6 +246,86 @@ wss.on('connection', async (ws) => {
     console.error('[WS init]', e.message);
   }
 });
+
+// 測試端點：立即觸發日報
+app.get('/api/report/test', async (_req, res) => {
+  await sendDailyReport();
+  res.json({ ok: true, message: '日報已發送至 LINE' });
+});
+
+// ── 每日開盤前報告 ─────────────────────────────────────────────────────────────
+async function sendDailyReport() {
+  try {
+    // 抓最新報價
+    const freshQuotes = await fetchQuotes();
+    const lines = [
+      '📊 美股開盤前日報',
+      `🕘 ${new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })}`,
+      '─────────────────',
+    ];
+
+    for (const sym of SYMBOLS) {
+      const q = freshQuotes[sym];
+      const a = alerts[sym] || {};
+      if (!q) continue;
+
+      // 近一週走勢（5d 日線）
+      let weekTrend = '';
+      try {
+        const chart5d = await fetchChart(sym, '5d', '1d');
+        if (chart5d.length >= 2) {
+          const oldest = chart5d[0].c;
+          const latest = chart5d[chart5d.length - 1].c;
+          const pct = ((latest - oldest) / oldest * 100).toFixed(2);
+          weekTrend = pct >= 0 ? `📈 近5日 +${pct}%` : `📉 近5日 ${pct}%`;
+        }
+      } catch {}
+
+      lines.push(`\n▌ ${sym}   $${q.price.toFixed(2)}`);
+      if (weekTrend) lines.push(weekTrend);
+
+      // 距高點警報
+      if (a.high) {
+        const diff = ((parseFloat(a.high) - q.price) / q.price * 100);
+        const abs  = Math.abs(diff).toFixed(2);
+        if (diff > 0) {
+          const icon = diff <= 2 ? '🔴' : diff <= 5 ? '🟡' : '🟢';
+          lines.push(`${icon} 距高點警報 還差 +${abs}%  (目標 $${parseFloat(a.high).toFixed(2)})`);
+        } else {
+          lines.push(`🚨 已超過高點警報 +${abs}%  (目標 $${parseFloat(a.high).toFixed(2)})`);
+        }
+      }
+
+      // 距低點警報
+      if (a.low) {
+        const diff = ((q.price - parseFloat(a.low)) / q.price * 100);
+        const abs  = Math.abs(diff).toFixed(2);
+        if (diff > 0) {
+          const icon = diff <= 2 ? '🔴' : diff <= 5 ? '🟡' : '🟢';
+          lines.push(`${icon} 距低點警報 還差 -${abs}%  (目標 $${parseFloat(a.low).toFixed(2)})`);
+        } else {
+          lines.push(`🚨 已跌破低點警報 -${abs}%  (目標 $${parseFloat(a.low).toFixed(2)})`);
+        }
+      }
+
+      if (!a.high && !a.low) lines.push('⚪ 尚未設定警報');
+    }
+
+    lines.push('\n─────────────────');
+    lines.push('🇺🇸 美股即將開盤，祝交易順利！');
+    sendLine(lines.join('\n'));
+    console.log('[daily report] sent');
+  } catch (e) {
+    console.error('[daily report] error:', e.message);
+  }
+}
+
+// 週一至週五 台灣時間 21:00（夏令，美股 9:30PM 開盤前 30 分鐘）
+cron.schedule('0 21 * * 1-5', sendDailyReport, { timezone: 'Asia/Taipei' });
+// 週一至週五 台灣時間 22:00（冬令，美股 10:30PM 開盤前 30 分鐘）
+cron.schedule('0 22 * * 1-5', sendDailyReport, { timezone: 'Asia/Taipei' });
+
+console.log('[cron] 每日開盤前報告已設定（夏令 21:00 / 冬令 22:00 台灣時間）');
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 server.listen(PORT, () => {
