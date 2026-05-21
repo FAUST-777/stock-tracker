@@ -6,6 +6,39 @@ const notifier = require('node-notifier');
 const fs       = require('fs');
 const path     = require('path');
 
+// ── LINE Bot config ───────────────────────────────────────────────────────────
+const cfg = fs.existsSync('./config.json')
+  ? JSON.parse(fs.readFileSync('./config.json', 'utf8'))
+  : {};
+const LINE_TOKEN  = cfg.line?.channelAccessToken ?? '';
+const LINE_USERID = cfg.line?.userId ?? '';
+
+function sendLine(text) {
+  if (!LINE_TOKEN || !LINE_USERID) return;
+  const body = JSON.stringify({
+    to: LINE_USERID,
+    messages: [{ type: 'text', text }],
+  });
+  const req = https.request({
+    hostname: 'api.line.me',
+    path:     '/v2/bot/message/push',
+    method:   'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'Authorization': `Bearer ${LINE_TOKEN}`,
+      'Content-Length': Buffer.byteLength(body),
+    },
+  }, (res) => {
+    if (res.statusCode !== 200) {
+      let d = ''; res.on('data', c => d += c);
+      res.on('end', () => console.error('[LINE]', res.statusCode, d));
+    }
+  });
+  req.on('error', e => console.error('[LINE] request error:', e.message));
+  req.write(body);
+  req.end();
+}
+
 const app    = express();
 const server = http.createServer(app);
 const wss    = new WebSocket.Server({ server });
@@ -129,6 +162,16 @@ function checkAlerts(quotes) {
         sound:   true,
         wait:    false,
       });
+      // LINE 推播
+      const lineMsg = [
+        `${emoji} ${sym} 價格警報！`,
+        `────────────────`,
+        `${dir}`,
+        `現價：$${price.toFixed(2)}`,
+        `目標：$${target.toFixed(2)}`,
+        `時間：${new Date().toLocaleTimeString('zh-TW')}`,
+      ].join('\n');
+      sendLine(lineMsg);
       triggered.push({ symbol: sym, type: kind, price, target });
       console.log(`[ALERT] ${sym} ${kind}: ${price} vs ${target}`);
     };

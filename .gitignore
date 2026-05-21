@@ -1,3 +1,4 @@
 node_modules/
 alerts.json
+config.json
 *.log
