@@ -91,14 +91,65 @@ chgEl.textContent   = `${arrow} ${chg}`;
 
 ---
 
+---
+
+## 第 2 輪開發（2026-05-21）｜LINE Bot 串接 & 每日開盤前日報
+
+### 完成功能
+
+**LINE Bot 即時警報推播**
+- 建立 LINE Official Account（Stock Alert Bot，`@235jvsce`）
+- 透過 LINE Developers Console 啟用 Messaging API
+- 警報觸發時同時發送 LINE 推播訊息，格式：
+  ```
+  📈 VOO 價格警報！
+  ────────────────
+  突破高點 🟢
+  現價：$680.00
+  目標：$678.00
+  時間：下午 10:30
+  ```
+- 憑證存於本機 `config.json`（gitignored，不上傳）
+
+**每日開盤前自動日報（node-cron 排程）**
+- 週一至週五自動執行，報告包含：
+  - 每支股票現價
+  - 近 5 日走勢百分比
+  - 距高/低點警報的距離（%），並以燈號標示風險：
+    - 🔴 ≤ 2%（危險）
+    - 🟡 ≤ 5%（注意）
+    - 🟢 > 5%（安全）
+- 排程時間（台灣時區）：
+  - 夏令（3-11月）：每天 **21:00**（美股 9:30PM 開盤前 30 分鐘）
+  - 冬令（11-3月）：每天 **22:00**（美股 10:30PM 開盤前 30 分鐘）
+- 手動測試端點：`GET /api/report/test`
+
+### 遇到的困難與解決方案
+
+**問題：LINE Official Account 建立流程改版**
+- 症狀：LINE Developers Console 已無法直接建立 Messaging API channel，要求先建 LINE Official Account
+- 解法：
+  1. 至 LINE Official Account Manager 建立帳號
+  2. 在「設定 → Messaging API」頁面啟用並連結 Provider
+  3. 再回到 LINE Developers Console 取得 Channel Access Token 與 User ID
+
+**問題：LINE User ID 位置不直觀**
+- 症狀：使用者誤將 Bot basic ID（`@235jvsce`）當作 User ID
+- 說明：
+  - **Bot basic ID**（`@235jvsce`）= Bot 的公開搜尋 ID
+  - **User ID**（`Ue47e...`）= 你個人帳號的唯一識別碼，在 Basic settings 頁籤最底部
+
+---
+
 ## 技術架構
 
 ```
 stock-tracker/
-├── server.js          # Express + WebSocket + 直接呼叫 Yahoo Finance v8 API
+├── server.js          # Express + WebSocket + Yahoo Finance v8 + LINE Bot + node-cron
 ├── public/
 │   └── index.html     # 單頁 Dashboard（Chart.js + WebSocket client）
 ├── alerts.json        # 持久化警報設定（gitignored）
+├── config.json        # LINE Bot 憑證（gitignored，不上傳）
 ├── package.json
 └── 啟動股票追蹤器.bat  # 雙擊啟動捷徑
 ```
@@ -113,6 +164,8 @@ stock-tracker/
 Yahoo Finance `/v8/finance/chart`（免費、無需 API Key、15 分鐘延遲）
 
 ## 未來規劃
+- [x] LINE Bot 警報推播
+- [x] 每日開盤前走勢日報
 - [ ] 自動交易腳本接入（待評估有 API 的券商，如 Interactive Brokers）
 - [ ] 多股票自訂追蹤清單
 - [ ] 警報歷史紀錄
