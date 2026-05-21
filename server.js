@@ -254,7 +254,7 @@ wss.on('connection', async (ws) => {
   }
 });
 
-// 測試端點：立即觸發日報
+// 手動測試日報（已停用自動排程，需要時手動呼叫）
 app.get('/api/report/test', async (_req, res) => {
   await sendDailyReport();
   res.json({ ok: true, message: '日報已發送至 LINE' });
@@ -403,12 +403,10 @@ async function sendDailyReport() {
   }
 }
 
-// 週一至週五 台灣時間 21:00（夏令，美股 9:30PM 開盤前 30 分鐘）
-cron.schedule('0 21 * * 1-5', sendDailyReport, { timezone: 'Asia/Taipei' });
-// 週一至週五 台灣時間 22:00（冬令，美股 10:30PM 開盤前 30 分鐘）
-cron.schedule('0 22 * * 1-5', sendDailyReport, { timezone: 'Asia/Taipei' });
-
-console.log('[cron] 每日開盤前報告已設定（夏令 21:00 / 冬令 22:00 台灣時間）');
+// 每日日報排程已停用，LINE 只在警報觸發時推播
+// 若需重新啟用，取消下方兩行註解：
+// cron.schedule('0 21 * * 1-5', sendDailyReport, { timezone: 'Asia/Taipei' });
+// cron.schedule('0 22 * * 1-5', sendDailyReport, { timezone: 'Asia/Taipei' });
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 server.listen(PORT, () => {
