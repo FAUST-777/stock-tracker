@@ -254,15 +254,52 @@ app.get('/api/report/test', async (_req, res) => {
 });
 
 // ── 每日開盤前報告 ─────────────────────────────────────────────────────────────
+// 抓大盤指數（S&P500 / NASDAQ / 道瓊 / VIX）
+async function fetchIndices() {
+  const indices = [
+    { sym: '^GSPC', label: 'S&P 500' },
+    { sym: '^IXIC', label: 'NASDAQ' },
+    { sym: '^DJI',  label: '道瓊 DJI' },
+    { sym: '^VIX',  label: 'VIX 恐慌' },
+  ];
+  const results = [];
+  for (const idx of indices) {
+    try {
+      const url  = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(idx.sym)}?interval=1d&range=1d`;
+      const data = await yfGet(url);
+      const m    = data?.chart?.result?.[0]?.meta ?? {};
+      const prev = m.chartPreviousClose ?? m.previousClose ?? 0;
+      const price = m.regularMarketPrice ?? 0;
+      const chgPct = prev ? ((price - prev) / prev * 100) : 0;
+      results.push({ label: idx.label, price, chgPct });
+    } catch {}
+  }
+  return results;
+}
+
 async function sendDailyReport() {
   try {
-    // 抓最新報價
-    const freshQuotes = await fetchQuotes();
+    // 抓最新報價 + 大盤指數（平行）
+    const [freshQuotes, indices] = await Promise.all([fetchQuotes(), fetchIndices()]);
     const lines = [
       '📊 美股開盤前日報',
       `🕘 ${new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })}`,
       '─────────────────',
     ];
+
+    // 大盤指數區塊
+    if (indices.length) {
+      lines.push('🌐 大盤指數');
+      for (const idx of indices) {
+        const arrow = idx.chgPct >= 0 ? '▲' : '▼';
+        const cls   = idx.chgPct >= 0 ? '+' : '';
+        const vixNote = idx.label.includes('VIX')
+          ? (idx.price >= 30 ? ' ⚠️高波動' : idx.price >= 20 ? ' 😐中波動' : ' 😌低波動')
+          : '';
+        lines.push(`  ${idx.label.padEnd(10)} ${idx.price.toFixed(2)}  ${arrow}${cls}${Math.abs(idx.chgPct).toFixed(2)}%${vixNote}`);
+      }
+      lines.push('─────────────────');
+    }
 
     for (const sym of SYMBOLS) {
       const q = freshQuotes[sym];
