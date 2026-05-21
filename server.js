@@ -47,10 +47,15 @@ const wss    = new WebSocket.Server({ server });
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-const SYMBOLS     = ['VOO', 'VTI', 'QQQ'];
+const US_SYMBOLS  = ['VOO', 'VTI', 'QQQ'];
+const TW_SYMBOLS  = ['2330.TW', '0050.TW'];
+const SYMBOLS     = [...US_SYMBOLS, ...TW_SYMBOLS];
 const ALERTS_FILE = path.join(__dirname, 'alerts.json');
 const PORT        = 3000;
 const INTERVAL_MS = 60_000;
+
+// 幣別判斷
+const currency = sym => sym.endsWith('.TW') ? 'NT$' : '$';
 
 // ── Direct Yahoo Finance HTTP helper ─────────────────────────────────────────
 const YF_HEADERS = {
@@ -100,6 +105,8 @@ async function fetchQuotes() {
         prevClose: prev,
         volume:    m.regularMarketVolume    ?? 0,
         marketState: m.marketState          ?? 'CLOSED',
+        currency:  currency(sym),
+        isTW:      sym.endsWith('.TW'),
       };
     } catch (e) {
       console.error(`[${sym}] fetch error:`, e.message);
@@ -345,6 +352,45 @@ async function sendDailyReport() {
         }
       }
 
+      if (!a.high && !a.low) lines.push('⚪ 尚未設定警報');
+    }
+
+    // 台股區塊
+    lines.push('\n🇹🇼 台股追蹤（當日收盤）');
+    for (const sym of TW_SYMBOLS) {
+      const q = freshQuotes[sym];
+      const a = alerts[sym] || {};
+      if (!q) continue;
+
+      let weekTrend = '';
+      try {
+        const chart5d = await fetchChart(sym, '5d', '1d');
+        if (chart5d.length >= 2) {
+          const pct = ((chart5d[chart5d.length-1].c - chart5d[0].c) / chart5d[0].c * 100).toFixed(2);
+          weekTrend = pct >= 0 ? `📈 近5日 +${pct}%` : `📉 近5日 ${pct}%`;
+        }
+      } catch {}
+
+      const label = sym === '2330.TW' ? '台積電 2330' : '元大50 0050';
+      lines.push(`\n▌ ${label}   NT$${q.price.toFixed(0)}`);
+      if (weekTrend) lines.push(weekTrend);
+
+      if (a.high) {
+        const diff = ((parseFloat(a.high) - q.price) / q.price * 100);
+        const abs  = Math.abs(diff).toFixed(2);
+        const icon = Math.abs(diff) <= 2 ? '🔴' : Math.abs(diff) <= 5 ? '🟡' : '🟢';
+        lines.push(diff > 0
+          ? `${icon} 距高點警報 還差 +${abs}%  (目標 NT$${parseFloat(a.high).toFixed(0)})`
+          : `🚨 已超過高點警報  (目標 NT$${parseFloat(a.high).toFixed(0)})`);
+      }
+      if (a.low) {
+        const diff = ((q.price - parseFloat(a.low)) / q.price * 100);
+        const abs  = Math.abs(diff).toFixed(2);
+        const icon = Math.abs(diff) <= 2 ? '🔴' : Math.abs(diff) <= 5 ? '🟡' : '🟢';
+        lines.push(diff > 0
+          ? `${icon} 距低點警報 還差 -${abs}%  (目標 NT$${parseFloat(a.low).toFixed(0)})`
+          : `🚨 已跌破低點警報  (目標 NT$${parseFloat(a.low).toFixed(0)})`);
+      }
       if (!a.high && !a.low) lines.push('⚪ 尚未設定警報');
     }
 

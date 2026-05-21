@@ -210,22 +210,48 @@ body{
 </div>
 
 <script>
-const SYMS = ['VOO','VTI','QQQ'];
+const US_SYMS = ['VOO','VTI','QQQ'];
+const TW_SYMS = ['2330.TW','0050.TW'];
+const SYMS    = [...US_SYMS, ...TW_SYMS];
 let quotes = {}, alerts = {}, selSym = SYMS[0], selPeriod = '1d';
 let mainChart = null;
-let chartBusy = false; // prevent concurrent chart loads
+let chartBusy = false;
 let pendingChartLoad = false;
+
+const symCurrency = sym => sym.endsWith('.TW') ? 'NT$' : '$';
+const symLabel    = sym => ({'2330.TW':'台積電 2330','0050.TW':'元大50 0050'}[sym] ?? sym);
+const symDecimals = sym => sym.endsWith('.TW') ? 0 : 2;
 
 // ── Build left panel (once) ───────────────────────────────────────────────────
 function buildLeft() {
   const panel = document.getElementById('left-panel');
-  SYMS.forEach(sym => {
+
+  // 美股 section header
+  const usHeader = document.createElement('div');
+  usHeader.style.cssText = 'font-size:.65rem;font-weight:700;color:#5a6478;letter-spacing:1px;padding:2px 4px;';
+  usHeader.textContent = '🇺🇸 美股';
+  panel.appendChild(usHeader);
+
+  [...US_SYMS, ...TW_SYMS].forEach((sym, idx) => {
+    // 台股 section header
+    if (idx === US_SYMS.length) {
+      const twHeader = document.createElement('div');
+      twHeader.style.cssText = 'font-size:.65rem;font-weight:700;color:#5a6478;letter-spacing:1px;padding:6px 4px 2px;margin-top:4px;border-top:1px solid #1c2230;';
+      twHeader.textContent = '🇹🇼 台股';
+      panel.appendChild(twHeader);
+    }
+
+    const cur  = symCurrency(sym);
+    const dec  = symDecimals(sym);
+    const step = sym.endsWith('.TW') ? '1' : '0.01';
+    const disp = symLabel(sym);
+
     const div = document.createElement('div');
     div.id = `srow-${sym}`;
     div.className = 'srow' + (sym === selSym ? ' active' : '');
     div.innerHTML = `
       <div class="srow-top" onclick="selectSym('${sym}')">
-        <span class="srow-sym">${sym}</span>
+        <span class="srow-sym" style="width:auto;font-size:.9rem">${disp}</span>
         <span class="srow-price" id="price-${sym}">--</span>
         <span class="srow-chg"   id="chg-${sym}">--</span>
         <span class="mkt-tag tag-CLOSED" id="mkt-${sym}">--</span>
@@ -237,11 +263,11 @@ function buildLeft() {
       <div class="srow-alerts">
         <div class="ai">
           <label>🔺突破</label>
-          <input type="number" id="inp-h-${sym}" placeholder="高點" step="0.01">
+          <input type="number" id="inp-h-${sym}" placeholder="高點 ${cur}" step="${step}">
         </div>
         <div class="ai">
           <label>🔻跌破</label>
-          <input type="number" id="inp-l-${sym}" placeholder="低點" step="0.01">
+          <input type="number" id="inp-l-${sym}" placeholder="低點 ${cur}" step="${step}">
         </div>
       </div>
       <div class="srow-btns">
@@ -261,27 +287,31 @@ function updatePrices(prevQuotes) {
     const cls = up ? 'up' : 'down';
     const arrow = up ? '▲' : '▼';
 
+    const cur = symCurrency(sym);
+    const dec = symDecimals(sym);
     const priceEl = document.getElementById(`price-${sym}`);
     const chgEl   = document.getElementById(`chg-${sym}`);
     const mktEl   = document.getElementById(`mkt-${sym}`);
-    if (priceEl) { priceEl.textContent = `$${q.price.toFixed(2)}`; priceEl.className = `srow-price ${cls}`; }
-    if (chgEl)   { chgEl.textContent = `${arrow} ${(up?'+':'')}${q.change.toFixed(2)} (${Math.abs(q.changePct).toFixed(2)}%)`; chgEl.className = `srow-chg ${cls}`; }
+    if (priceEl) { priceEl.textContent = `${cur}${q.price.toFixed(dec)}`; priceEl.className = `srow-price ${cls}`; }
+    if (chgEl)   { chgEl.textContent = `${arrow} ${(up?'+':'')}${q.change.toFixed(dec)} (${Math.abs(q.changePct).toFixed(2)}%)`; chgEl.className = `srow-chg ${cls}`; }
     if (mktEl)   { mktEl.textContent = mktLabel(q.marketState); mktEl.className = `mkt-tag tag-${q.marketState}`; }
 
     const a = alerts[sym] || {};
     const chipH = document.getElementById(`chip-h-${sym}`);
     const chipL = document.getElementById(`chip-l-${sym}`);
-    if (chipH) { chipH.textContent = a.high ? `🔺 $${parseFloat(a.high).toFixed(2)}` : '🔺 未設定'; chipH.className = `achip${a.high?' h-set':''}`; }
-    if (chipL) { chipL.textContent = a.low  ? `🔻 $${parseFloat(a.low).toFixed(2)}`  : '🔻 未設定'; chipL.className = `achip${a.low?' l-set':''}`; }
+    if (chipH) { chipH.textContent = a.high ? `🔺 ${cur}${parseFloat(a.high).toFixed(dec)}` : '🔺 未設定'; chipH.className = `achip${a.high?' h-set':''}`; }
+    if (chipL) { chipL.textContent = a.low  ? `🔻 ${cur}${parseFloat(a.low).toFixed(dec)}`  : '🔻 未設定'; chipL.className = `achip${a.low?' l-set':''}`; }
   });
 
   // update right-panel header if selected sym changed
   const q = quotes[selSym]; if (!q) return;
   const up = q.change >= 0;
-  document.getElementById('ct-sym').textContent   = selSym;
-  document.getElementById('ct-price').textContent = `$${q.price.toFixed(2)}`;
+  const cur = symCurrency(selSym);
+  const dec = symDecimals(selSym);
+  document.getElementById('ct-sym').textContent   = symLabel(selSym);
+  document.getElementById('ct-price').textContent = `${cur}${q.price.toFixed(dec)}`;
   const ctChg = document.getElementById('ct-chg');
-  ctChg.textContent = `${up?'▲':'▼'} ${(up?'+':'')}${q.change.toFixed(2)} (${Math.abs(q.changePct).toFixed(2)}%)`;
+  ctChg.textContent = `${up?'▲':'▼'} ${(up?'+':'')}${q.change.toFixed(dec)} (${Math.abs(q.changePct).toFixed(2)}%)`;
   ctChg.className   = `ch-chg ${up?'up':'down'}`;
 }
 
