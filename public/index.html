@@ -397,10 +397,13 @@ const WARN_COLOR = '#ff9500';
 const warningLinePlugin = {
   id: 'warningLine',
   afterDatasetsDraw(chart) {
+    // 銷毀 / 重建過程 scales 可能還沒建立或已被拆除，先防呆避免丟例外卡住 canvas
+    const yScale = chart.scales && chart.scales.y;
+    if (!yScale || !chart.chartArea) return;
     const a = alerts[selSym] || {};
     const low = (a.low != null && a.low !== '') ? parseFloat(a.low) : null;
     if (low == null || isNaN(low)) return;
-    const y = chart.scales.y.getPixelForValue(low);
+    const y = yScale.getPixelForValue(low);
     const { left, right, top, bottom } = chart.chartArea;
     if (y < top - 1 || y > bottom + 1) return;
 
@@ -473,10 +476,12 @@ async function loadMainChart() {
     }
     lastWarnKey = `${selSym}:${a.low ?? ''}`;
 
-    // destroy old chart safely
-    if (mainChart) { mainChart.destroy(); mainChart = null; }
-
+    // destroy old chart safely（連 canvas 上殘留的 Chart 實例一起清掉，避免 "Canvas already in use"）
     const canvas = document.getElementById('main-chart');
+    const stale = mainChart || (window.Chart && Chart.getChart(canvas));
+    if (stale) { try { stale.destroy(); } catch (_) {} }
+    mainChart = null;
+
     const ctx = canvas.getContext('2d');
     const grad = ctx.createLinearGradient(0, 0, 0, canvas.offsetHeight || 400);
     grad.addColorStop(0, up ? 'rgba(0,212,170,.15)' : 'rgba(255,77,109,.15)');
