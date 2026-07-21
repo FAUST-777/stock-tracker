@@ -141,6 +141,54 @@ chgEl.textContent   = `${arrow} ${chg}`;
 
 ---
 
+## 第 3 輪開發（2026-07-21）｜跌破警戒基準線 & 切換週期崩潰修正
+
+### 完成功能
+
+**主圖表橘色警戒基準線**
+- 在主走勢圖上，依每檔在左側設定的「🔻跌破」低點水位（`alerts.json` 的 `low`），畫出一條橘色（`#ff9500`）虛線基準線，並標上「警戒 $xxx」標籤
+- y 軸範圍自動延伸涵蓋警戒線（`suggestedMin`），即使現價還在水位上方一段距離，基準線仍看得到，方便目測距離
+- 以 Chart.js inline plugin（`afterDatasetsDraw`）實作，直接在 canvas 上畫線，不需額外載入 annotation 套件
+- 切換股票 / 週期、或改動低點後自動重繪（`maybeRedrawWarning()` 用 `lastWarnKey` 判斷是否真的變動，避免每 60 秒 tick 都重載）
+
+### 遇到的問題與解決方案
+
+**問題：切換到 6月 / 1年 圖表卡住不更新**
+- 症狀：點右上角「6月」「1年」，按鈕變成 active，但圖表完全沒換資料，X 軸還停在今日盤中時間。切「今日 → 5日」等任何一次切換後就壞掉，只有第一次載入的 1d 正常。
+- Console 兩個接連的錯誤：
+  ```
+  [chart] Cannot read properties of undefined (reading 'getPixelForValue')
+  [chart] Canvas is already in use. Chart with ID '0' must be destroyed...
+  ```
+- **根因（連鎖反應）：**
+  1. 切換週期時流程為「先 `mainChart.destroy()` 銷毀舊圖 → 再 `new Chart()` 建新圖」
+  2. `destroy()` 過程中 Chart.js 會做最後一次繪製，此時 y 軸（`chart.scales.y`）已被拆除變成 `undefined`
+  3. 新加的警戒線 plugin 在 `afterDatasetsDraw` 讀 `chart.scales.y.getPixelForValue()` → 丟出例外
+  4. 例外中斷了 `destroy()`，舊圖表殘留佔用 canvas；接著 `new Chart()` 報 "Canvas already in use" 建不起來
+  5. 畫面就卡在原本的 1d 資料 → 表面上看起來是「切 6月/1年沒反應」
+  - 第一次載入 1d 沒有舊圖要銷毀，不會觸發，所以只有**切換**才壞。
+- **解法（2 處）：**
+  1. **plugin 防呆**：`afterDatasetsDraw` 開頭檢查 `chart.scales.y` 與 `chart.chartArea`，還沒建立或已被拆除就直接 return，杜絕在銷毀過程丟例外
+  2. **強化銷毀**：建新圖前用 `Chart.getChart(canvas)` 抓出 canvas 上任何殘留實例一併 `destroy()`，並用 `try/catch` 包住，徹底避免 "Canvas already in use"
+  ```javascript
+  // plugin 防呆
+  afterDatasetsDraw(chart) {
+    const yScale = chart.scales && chart.scales.y;
+    if (!yScale || !chart.chartArea) return;
+    ...
+  }
+
+  // 強化銷毀（取代原本只判斷 mainChart 的寫法）
+  const stale = mainChart || (window.Chart && Chart.getChart(canvas));
+  if (stale) { try { stale.destroy(); } catch (_) {} }
+  mainChart = null;
+  ```
+- **驗證：** 用瀏覽器實測，今日↔5日↔1月↔6月↔1年 來回切換全部正常更新，X 軸正確顯示日期，橘色警戒線持續正確貼在對應水位，console 零錯誤。
+
+**關鍵收穫：** 自訂 Chart.js plugin 在 `afterDatasetsDraw` 等 hook 內存取 `chart.scales` / `chart.chartArea` 時，一定要先判斷是否存在——因為 `destroy()`、resize、重建等生命週期階段都可能觸發繪製，而該階段 scales 可能尚未建立或已被拆除。plugin 只要丟例外，就會連帶讓 `destroy()` 中斷、canvas 被殘留實例佔死。
+
+---
+
 ## 技術架構
 
 ```
@@ -166,6 +214,7 @@ Yahoo Finance `/v8/finance/chart`（免費、無需 API Key、15 分鐘延遲）
 ## 未來規劃
 - [x] LINE Bot 警報推播
 - [x] 每日開盤前走勢日報
+- [x] 主圖表跌破警戒基準線（橘色）
 - [ ] 自動交易腳本接入（待評估有 API 的券商，如 Interactive Brokers）
 - [ ] 多股票自訂追蹤清單
 - [ ] 警報歷史紀錄
