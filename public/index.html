@@ -334,10 +334,11 @@ function connect() {
         alerts = msg.alerts || {};
         updatePrices({});
         restoreAlertInputs();
+        maybeRedrawWarning();
         document.getElementById('last-ts').textContent = new Date(msg.ts).toLocaleTimeString('zh-TW');
         if (msg.triggered?.length) showOverlay(msg.triggered[0]);
       }
-      if (msg.type === 'alerts') { alerts = msg.alerts || {}; updatePrices({}); restoreAlertInputs(); }
+      if (msg.type === 'alerts') { alerts = msg.alerts || {}; updatePrices({}); restoreAlertInputs(); maybeRedrawWarning(); }
     } catch {}
   };
   ws.onclose = () => {
@@ -391,6 +392,54 @@ function clearAlert(sym) {
   });
 }
 
+// ── 警戒基準線 plugin（橘色，畫在跌破低點水位）────────────────────────────────
+const WARN_COLOR = '#ff9500';
+const warningLinePlugin = {
+  id: 'warningLine',
+  afterDatasetsDraw(chart) {
+    const a = alerts[selSym] || {};
+    const low = (a.low != null && a.low !== '') ? parseFloat(a.low) : null;
+    if (low == null || isNaN(low)) return;
+    const y = chart.scales.y.getPixelForValue(low);
+    const { left, right, top, bottom } = chart.chartArea;
+    if (y < top - 1 || y > bottom + 1) return;
+
+    const ctx = chart.ctx;
+    const cur = symCurrency(selSym);
+    const dec = symDecimals(selSym);
+    const label = `警戒 ${cur}${low.toFixed(dec)}`;
+
+    ctx.save();
+    // 虛線
+    ctx.beginPath();
+    ctx.setLineDash([6, 4]);
+    ctx.moveTo(left, y);
+    ctx.lineTo(right, y);
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = WARN_COLOR;
+    ctx.stroke();
+    // 標籤
+    ctx.setLineDash([]);
+    ctx.font = '700 11px "Segoe UI",system-ui,sans-serif';
+    const tw = ctx.measureText(label).width;
+    const pad = 5;
+    ctx.fillStyle = WARN_COLOR;
+    ctx.fillRect(left + 4, y - 8, tw + pad * 2, 16);
+    ctx.fillStyle = '#000';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, left + 4 + pad, y + 1);
+    ctx.restore();
+  }
+};
+
+// 記錄目前警戒線狀態，只有真正變動時才重繪圖表（含 y 軸範圍）
+let lastWarnKey = '';
+function maybeRedrawWarning() {
+  const a = alerts[selSym] || {};
+  const key = `${selSym}:${a.low ?? ''}`;
+  if (key !== lastWarnKey && mainChart) loadMainChart();
+}
+
 // ── Main chart (with concurrency guard) ───────────────────────────────────────
 async function loadMainChart() {
   if (chartBusy) { pendingChartLoad = true; return; }
@@ -413,6 +462,16 @@ async function loadMainChart() {
     const q   = quotes[selSym];
     const up  = q ? q.change >= 0 : (prices[prices.length-1] >= prices[0]);
     const col = up ? '#00d4aa' : '#ff4d6d';
+
+    // 讓 y 軸範圍涵蓋警戒線，跌破水位才看得到基準線
+    const a = alerts[selSym] || {};
+    const lowLine = (a.low != null && a.low !== '') ? parseFloat(a.low) : null;
+    let yMin;
+    if (lowLine != null && !isNaN(lowLine)) {
+      yMin = Math.min(Math.min(...prices), lowLine);
+      yMin = yMin - (Math.max(...prices) - yMin) * 0.05; // 底部留一點空間
+    }
+    lastWarnKey = `${selSym}:${a.low ?? ''}`;
 
     // destroy old chart safely
     if (mainChart) { mainChart.destroy(); mainChart = null; }
@@ -449,9 +508,10 @@ async function loadMainChart() {
         },
         scales: {
           x: { grid:{color:'#1a1e2a'}, ticks:{color:'#5a6478',maxTicksLimit:8,font:{size:11}} },
-          y: { grid:{color:'#1a1e2a'}, ticks:{color:'#5a6478',callback:v=>'$'+v.toFixed(0),font:{size:11}}, position:'right' },
+          y: { grid:{color:'#1a1e2a'}, ticks:{color:'#5a6478',callback:v=>'$'+v.toFixed(0),font:{size:11}}, position:'right', suggestedMin: yMin },
         },
-      }
+      },
+      plugins: [warningLinePlugin],
     });
   } catch (e) {
     console.error('[chart]', e.message);
